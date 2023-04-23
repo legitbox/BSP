@@ -17,6 +17,7 @@ Bedrock Server Pilot is a program designed to make managing a Minecraft Bedrock 
 # BDSX stuff
   - add basic BDSX support
   - add a quick access section to the program if BDSX is detected in the root of where the program is running
+  
 # maybe will do
   - an antilag like system that would input the kill command for grounded items with a selectable timer
   
