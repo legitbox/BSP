@@ -1,4 +1,4 @@
-![](https://github.com/legitbox/BSP/blob/main/BSP_logo.png?raw=true)
+![](https://github.com/legitbox/BSP/blob/main/BSPpng_icon.png?raw=true)
 # Bedrock Server Pilot
 Is a program designed to make managing a Minecraft Bedrock dedicated server a breeze
 
