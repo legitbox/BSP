@@ -10,8 +10,9 @@ import shutil
 import http.server
 
 import addon_manager
-import http_server
 import settings
+# import http_server
+
 
 current_dir = os.getcwd()
 
