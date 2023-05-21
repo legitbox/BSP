@@ -5,6 +5,9 @@ import shutil
 import re
 import json
 
+# the only difference between this is that everything is in a function, so it can be run from the main file
+# this is more of a test
+
 def launch_addon_manager():
     
     def select_world_folder():
