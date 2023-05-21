@@ -1,0 +1,29 @@
+{
+  "format_version": 2,
+  "header": {
+    "description": "A BDS Chat Bridge to BSPilot addon by the BSP team",
+    "name": "BSP Chat",
+    "uuid": "f53d22bb-5202-411b-826c-be787d377520",
+    "version": [0, 0, 3],
+    "min_engine_version": [ 1, 19, 80 ]
+  },
+  "modules": [
+    {
+      "type": "script",
+      "language": "javascript",
+      "uuid": "b4041284-99e0-4e42-844d-dce5093b2095",
+      "version": [0, 0, 1],
+      "entry": "scripts/chat_relay.js"
+    }
+  ],
+  "dependencies": [
+    {
+      "module_name": "@minecraft/server",
+      "version": "1.2.0-beta"
+    },
+    {
+      "module_name": "@minecraft/server-net",
+      "version": "1.0.0-beta"
+    }
+  ]
+}
