@@ -11,8 +11,6 @@ import http.server
 
 import addon_manager
 import settings
-# import http_server
-
 
 current_dir = os.getcwd()
 
@@ -22,7 +20,8 @@ server_dir = os.path.join(parent_dir, "bedrock_server.exe")
 
 properties_dir = os.path.join(parent_dir, "server.properties")
 
-#bat_file = (r'C:\BDS\bedrock-server-1.19.81.01\bedrock_server.exe')
+permissions_dir = os.path.join(parent_dir, "permissions.json")
+
 process = None
 
 config_file = 'config.ini'
@@ -58,7 +57,7 @@ JOIN_PATTERN = re.compile(r"Player connected: ([^\s]+), xuid: (\d+)")
 LEAVE_PATTERN = re.compile(r"Player disconnected: ([^\s]+), xuid: (\d+)")
 
 # load permissions from file
-with open(r'C:\BDS\bedrock-server-1.19.81.01\permissions.json') as f:
+with open(permissions_dir) as f:
     permissions = json.load(f)
 
 def run_server_exe():
