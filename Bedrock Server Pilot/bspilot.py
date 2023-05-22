@@ -85,7 +85,7 @@ def run_server_exe():
         if match:
             player_name = match.group(1)
             xuid = match.group(2)
-            with open(r'C:\BDS\bedrock-server-1.19.81.01\permissions.json') as f: # this error is given when sending shat messages to the local http server
+            with open(permissions_dir) as f: # this error is given when sending shat messages to the local http server
                 permissions = json.load(f)
             level = None
             for permission in permissions:
@@ -142,7 +142,7 @@ def update_permissions_thread():
     row_number = values['player_list'][0]
     xuid = player_list[row_number][1]
     # Update the player level
-    with open(r'C:\BDS\bedrock-server-1.19.81.01\permissions.json') as f:
+    with open(permissions_dir) as f:
         permissions = json.load(f)       
     level = None
     for permission in permissions:
