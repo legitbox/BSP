@@ -14,7 +14,7 @@ def start_timer(minutes, active, window):
             window.write_event_value('-UPDATE-', f"{seconds // 60}:{seconds % 60:02}")
             time.sleep(1)
             seconds -= 1
-        window.write_event_value('-UPDATE-', "Initiating backup")
+        window.write_event_value('-UPDATE-', "Time's up!")
         say_hello()
         time.sleep(1)  # Wait for 1 second before starting the timer again
 

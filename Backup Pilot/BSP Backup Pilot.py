@@ -1,74 +1,77 @@
+import os
+import shutil
+from datetime import datetime
+import zipfile
 import PySimpleGUI as sg
-import time
+import configparser
 
-def say_hello():
-    print("Hello, world!")
+# Configuration file path
+CONFIG_FILE = 'config.ini'
 
-class TimerGUI:
-    def __init__(self):
-        self.layout = [
-            [sg.Text("Set timer in minutes:"), sg.Input(key="-MINUTES-", size=(10, 1))],
-            [sg.Button("Start"), sg.Button("Stop")],
-            [sg.Text("Timer: ", key="-TIMER-")]
-        ]
-        self.window = sg.Window("Timer", self.layout, finalize=True)
-        self.active = False
-        self.start_time = 0
-        self.minutes = 0
+# Create a default config file if it doesn't exist
+if not os.path.exists(CONFIG_FILE):
+    config = configparser.ConfigParser()
+    config['DEFAULT'] = {'backup_location': '', 'zip_backup': 'False'}
+    with open(CONFIG_FILE, 'w') as configfile:
+        config.write(configfile)
 
-    def start_timer(self):
-        minutes = int(self.window["-MINUTES-"].get())
-        if minutes <= 0:
-            sg.popup("Please enter a valid number of minutes.")
-            return
+# Load config file
+config = configparser.ConfigParser()
+config.read(CONFIG_FILE)
+backup_location = config['DEFAULT']['backup_location']
+zip_backup = config['DEFAULT'].getboolean('zip_backup')
 
-        self.active = True
-        self.start_time = time.time()
-        self.minutes = minutes
-        self.update_timer()  # Start updating the timer immediately
+# Set the theme to DarkAmber
+sg.theme('DarkAmber')
 
-    def stop_timer(self):
-        self.active = False
+# GUI layout
+layout = [
+    [sg.Text('Backup Location'), sg.InputText(default_text=backup_location, key='-FOLDER-'), sg.FolderBrowse(target='-FOLDER-')],
+    [sg.Checkbox('Store backup as a zip file', default=zip_backup, key='-ZIP-')],
+    [sg.Output(size=(60, 10), key='-OUTPUT-')],
+    [sg.Button('Backup Now'), sg.Button('Exit')]
+]
 
-    def update_timer(self):
-        if self.active:
-            elapsed_time = int(time.time() - self.start_time)
-            remaining_seconds = self.minutes * 60 - elapsed_time
+# Create the window
+window = sg.Window('Backup Program', layout)
 
-            if remaining_seconds > 0:
-                minutes = remaining_seconds // 60
-                seconds = remaining_seconds % 60
-                self.window["-TIMER-"].update(f"{minutes}:{seconds:02}")
+# Event loop
+while True:
+    event, values = window.read()
+    if event == sg.WINDOW_CLOSED or event == 'Exit':
+        break
+    elif event == 'Backup Now':
+        backup_location = values['-FOLDER-']
+        zip_backup = values['-ZIP-']
+        
+        # Update config file
+        config['DEFAULT']['backup_location'] = backup_location
+        config['DEFAULT']['zip_backup'] = str(zip_backup)
+        with open(CONFIG_FILE, 'w') as configfile:
+            config.write(configfile)
+        
+        # Perform backup
+        try:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            
+            if zip_backup:
+                # Create a zip file
+                zip_filename = os.path.join(backup_location, f'backup_{timestamp}.zip')
+                with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as backup_zip:
+                    for root, dirs, files in os.walk('.'):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            rel_path = os.path.relpath(file_path)
+                            backup_zip.write(file_path, arcname=rel_path)
+                
+                print(f'Backup created successfully as a zip file at: {zip_filename}')
             else:
-                self.window.write_event_value('-UPDATE-', "Initiating backup")
-                say_hello()
-                self.active = False
+                backup_folder = os.path.join(backup_location, f'backup_{timestamp}')
+                shutil.copytree('.', backup_folder)
+                print(f'Backup created successfully at: {backup_folder}')
+        
+        except Exception as e:
+            print(f'Error occurred during backup: {e}')
 
-        if self.active:
-            self.window.write_event_value('-UPDATE-', "")  # Trigger event to update timer again
-            self.window.refresh()  # Refresh the window to process the event
-
-    def run(self):
-        while True:
-            event, _ = self.window.read()
-            if event == sg.WINDOW_CLOSED:
-                break
-
-            if event == "Start":
-                if not self.active:
-                    self.start_timer()
-
-            if event == "Stop":
-                if self.active:
-                    self.stop_timer()
-                    self.window["-TIMER-"].update('')
-
-            if event == "-UPDATE-":
-                self.window.refresh()  # Refresh the window to update the timer
-                self.update_timer()
-
-        self.window.close()
-
-if __name__ == "__main__":
-    timer_gui = TimerGUI()
-    timer_gui.run()
+# Close the window
+window.close()
