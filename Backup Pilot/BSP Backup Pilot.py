@@ -1,113 +1,78 @@
 import os
 import shutil
-from datetime import datetime
-import zipfile
+import time
+import asyncio
 import PySimpleGUI as sg
 import configparser
-import threading
-import time
 
-# Configuration file path
-CONFIG_FILE = 'config.ini'
+CONFIG_FILE = "config.ini"
 
-# Create a default config file if it doesn't exist
-if not os.path.exists(CONFIG_FILE):
+async def main():
+    # Load backup settings from the config file
     config = configparser.ConfigParser()
-    config['DEFAULT'] = {'backup_location': '', 'zip_backup': 'False'}
-    with open(CONFIG_FILE, 'w') as configfile:
-        config.write(configfile)
+    config.read(CONFIG_FILE)
+    backup_folder = config.get("BACKUP", "BackupFolder", fallback="")
+    backup_location = config.get("BACKUP", "BackupLocation", fallback="")
+    backup_interval = config.getint("BACKUP", "BackupInterval", fallback=3600)
+    autostart_enabled = config.getboolean("BACKUP", "AutostartEnabled", fallback=False)
 
-# Load config file
-config = configparser.ConfigParser()
-config.read(CONFIG_FILE)
-backup_location = config['DEFAULT']['backup_location']
-zip_backup = config['DEFAULT'].getboolean('zip_backup')
+    # Define the window's contents
+    layout = [[sg.Text("Backup Folder")],
+              [sg.Input(default_text=backup_folder), sg.FolderBrowse()],
+              [sg.Text("Backup Location")],
+              [sg.Input(default_text=backup_location), sg.FolderBrowse()],
+              [sg.Text("Backup Interval (in seconds)")],
+              [sg.InputText(default_text=str(backup_interval))],
+              [sg.Checkbox("Autostart", default=autostart_enabled, key="autostart")],
+              [sg.Output(size=(60, 10))],
+              [sg.Button("Start Backup"), sg.Button("Backup Now"), sg.Button("Exit")]]
+    # Create the window
+    window = sg.Window("Folder Backup", layout, enable_close_attempted_event=True)
 
-# Set the theme to DarkAmber
-sg.theme('DarkAmber')
+    # Event loop for the GUI
+    while True:
+        event, values = window.read(timeout=10)
 
-# GUI layout
-layout = [
-    [sg.Text('Backup Location'), sg.InputText(default_text=backup_location, key='-FOLDER-'), sg.FolderBrowse(target='-FOLDER-')],
-    [sg.Checkbox('Store backup as a zip file', default=zip_backup, key='-ZIP-')],
-    [sg.Text("Set timer in minutes:"), sg.Input(key="-MINUTES-", size=(10, 1))],
-    [sg.Button("Start"), sg.Button("Stop")],
-    [sg.Text("Timer: ", key="-TIMER-")],
-    [sg.Output(size=(60, 10), key='-OUTPUT-')],
-    [sg.Text("Version: Hydrogen 2")],
-    [sg.Button('Exit')]
-]
-
-# Create the window
-window = sg.Window('Backup Program', layout)
-
-# Event loop
-active = [False]
-
-def start_timer(minutes, active, window):
-    while active[0]:
-        seconds = minutes * 60
-        while seconds > 0:
-            if not active[0]:
-                return
-            window.write_event_value('-UPDATE-', f"{seconds // 60}:{seconds % 60:02}")
-            time.sleep(1)
-            seconds -= 1
-        window.write_event_value('-UPDATE-', "Making the backup!")
-        perform_backup()
-        time.sleep(1)  # Wait for 1 second before starting the timer again
-
-def perform_backup():
-    backup_location = window['-FOLDER-'].get()
-    zip_backup = window['-ZIP-'].get()
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-
-    try:
-        if zip_backup:
-            # Create a zip file
-            zip_filename = os.path.join(backup_location, f'backup_{timestamp}.zip')
-            with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as backup_zip:
-                for root, dirs, files in os.walk('.'):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(file_path)
-                        backup_zip.write(file_path, arcname=rel_path)
-            print(f'Backup created successfully as a zip file at: {zip_filename}')
-        else:
-            backup_folder = os.path.join(backup_location, f'backup_{timestamp}')
-            shutil.copytree('.', backup_folder)
-            print(f'Backup created successfully at: {backup_folder}')
-    except Exception as e:
-        print(f'Error occurred during backup: {e}')
-
-while True:
-    event, values = window.read()
-    if event == sg.WINDOW_CLOSED or event == 'Exit':
-        break
-    elif event == 'Start':
-        if not active[0]:
+        if event == "Exit" or event == sg.WINDOW_CLOSE_ATTEMPTED_EVENT:
+            break
+        elif event == "Backup Now":
+            await backup_folder(values[0], values[1])
+        elif event == "Start Backup":
             try:
-                minutes = int(values["-MINUTES-"])
-                if minutes > 0:
-                    active[0] = True
-                    timer_thread = threading.Thread(target=start_timer, args=(minutes, active, window))
-                    timer_thread.daemon = True
-                    timer_thread.start()
-                else:
-                    sg.popup("Please enter a valid number of minutes.")
+                print("Starting timer process")
+                interval = int(values[2])
+                asyncio.create_task(run_backup_interval(values[0], values[1], interval))
             except ValueError:
-                sg.popup("Please enter a valid number of minutes.")
-    elif event == 'Stop':
-        if active[0]:
-            active[0] = False
-            window['-TIMER-'].update('')
-            time.sleep(1)  # Wait for the timer thread to complete
-            continue
-    elif event == 'Backup Now':
-        perform_backup()
+                print("Invalid interval value")
 
-    if event == "-UPDATE-":
-        window['-TIMER-'].update(values[event])
+        await asyncio.sleep(0)  # Allow other tasks to run
 
-# Close the window
-window.close()
+    window.close()
+
+    # Save backup settings to the config file
+    config["BACKUP"] = {
+        "BackupFolder": values[0],
+        "BackupLocation": values[1],
+        "BackupInterval": values[2],
+        "AutostartEnabled": str(values["autostart"])
+    }
+    with open(CONFIG_FILE, "w") as config_file:
+        config.write(config_file)
+
+    # Start backup loop if autostart is enabled
+    if values["autostart"]:
+        asyncio.create_task(run_backup_interval(values[0], values[1], int(values[2])))
+
+async def run_backup_interval(src_folder, dst_folder, interval):
+    while True:
+        await backup_folder(src_folder, dst_folder)
+        await asyncio.sleep(interval)
+
+async def backup_folder(src_folder, dst_folder):
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    zip_filename = os.path.join(dst_folder, f"backup_{timestamp}.zip")
+    print(f"Backing up {src_folder} to {zip_filename}")
+    await asyncio.to_thread(shutil.make_archive, zip_filename[:-4], "zip", src_folder)
+
+if __name__ == "__main__":
+    asyncio.run(main())

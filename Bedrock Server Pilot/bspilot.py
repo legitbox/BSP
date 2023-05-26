@@ -57,8 +57,8 @@ JOIN_PATTERN = re.compile(r"Player connected: ([^\s]+), xuid: (\d+)")
 LEAVE_PATTERN = re.compile(r"Player disconnected: ([^\s]+), xuid: (\d+)")
 
 # load permissions from file
-with open(permissions_dir) as f:
-    permissions = json.load(f)
+#with open(permissions_dir) as f:
+#    permissions = json.load(f)
 
 def run_server_exe():
     global process
