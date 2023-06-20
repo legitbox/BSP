@@ -1,7 +1,7 @@
 {
   "format_version": 2,
   "header": {
-    "description": "A BDS Chat Bridge to BSPilot addon by the BSP team",
+    "description": "A BDS Chat Bridge to BSPilot by the BSP team",
     "name": "BSP Chat",
     "uuid": "f53d22bb-5202-411b-826c-be787d377520",
     "version": [0, 0, 3],
@@ -19,11 +19,7 @@
   "dependencies": [
     {
       "module_name": "@minecraft/server",
-      "version": "1.2.0-beta"
-    },
-    {
-      "module_name": "@minecraft/server-net",
-      "version": "1.0.0-beta"
+      "version": "1.3.0-beta"
     }
   ]
 }

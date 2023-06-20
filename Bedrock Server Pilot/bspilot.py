@@ -57,16 +57,19 @@ JOIN_PATTERN = re.compile(r"Player connected: ([^\s]+), xuid: (\d+)")
 LEAVE_PATTERN = re.compile(r"Player disconnected: ([^\s]+), xuid: (\d+)")
 
 # load permissions from file
-#with open(permissions_dir) as f:
-#    permissions = json.load(f)
+with open(permissions_dir) as f:
+    permissions = json.load(f)
 
 def run_server_exe():
     global process
     global player_list
     global player_count
+    global latest_message
+
     with lock:
         if process is None:
             process = subprocess.Popen([server_dir], stdout=subprocess.PIPE, stdin=subprocess.PIPE, universal_newlines=True, shell=True)
+
     output = ""
     while True:
         line = process.stdout.readline()
@@ -75,38 +78,50 @@ def run_server_exe():
             with lock:
                 process = None
             break
+
         if line:
             line = re.sub(r'\033\[\d{1,2}m', '', line)
-            if 'Web response body of unsupported content-type' not in line:
-                output += line
-                window['output'].update(output.strip())
+            #if 'Scripting' not in line:
+            output += line
+            window['output'].update(output.strip())
 
-        match = JOIN_PATTERN.search(line)
-        if match:
-            player_name = match.group(1)
-            xuid = match.group(2)
-            with open(permissions_dir) as f: # this error is given when sending shat messages to the local http server
-                permissions = json.load(f)
-            level = None
-            for permission in permissions:
-                if permission['xuid'] == xuid:
-                    level = permission['permission'].capitalize()
-                    break
-            player_list.append([player_name, xuid, level])  # append list containing player data
-            window['player_list'].update(values=player_list)  # update player list with list of lists
-            player_count += 1  # increment player count
-            window['-ONLINE_PLAYERS-'].update(player_count)  # update player count display
+            match = JOIN_PATTERN.search(line)
+            if match:
+                player_name = match.group(1)
+                xuid = match.group(2)
+                with open(permissions_dir) as f:
+                    permissions = json.load(f)
+                level = None
+                for permission in permissions:
+                    if permission['xuid'] == xuid:
+                        level = permission['permission'].capitalize()
+                        break
+                player_list.append([player_name, xuid, level])
+                window['player_list'].update(values=player_list)
+                player_count += 1
+                window['-ONLINE_PLAYERS-'].update(player_count)
 
-        # search for player leave event
-        match = LEAVE_PATTERN.search(line)
-        if match:
-            player_name = match.group(1)
-            player_list = [p for p in player_list if p[0] != player_name]  # remove player by name only
-            window['player_list'].update(values=player_list)  # update player list with list of lists
-            player_count -= 1  # decrement player count
-            window['-ONLINE_PLAYERS-'].update(player_count)  # update player count display
+            match = LEAVE_PATTERN.search(line)
+            if match:
+                player_name = match.group(1)
+                player_list = [p for p in player_list if p[0] != player_name]
+                window['player_list'].update(values=player_list)
+                player_count -= 1
+                window['-ONLINE_PLAYERS-'].update(player_count)
 
-        # update server status
+            if 'Scripting' in line:
+                match = re.search(r'\[Scripting\] \[([^\]]+)\]', line)
+                if match:
+                    sender_name = match.group(1)
+                    message_match = re.search(r'\[([^\]]+)\]$', line)
+                    if message_match:
+                        message = message_match.group(1)
+                        formatted_message = f"<{sender_name}> {message}"
+                        save_message_to_file(formatted_message)
+                        message_list.append(formatted_message)
+                        window["ingame_chat"].update(values=message_list)
+
+
         if 'Starting Server' in line:
             window['-SERVER_STATE-'].update('Starting')
         elif 'Server started.' in line:
@@ -117,6 +132,8 @@ def run_server_exe():
             window['-SERVER_STATE-'].update('Stopped')
         elif "Fail" in line or "Error" in line or "error" in line or "fail" in line or "exit" in line or "Exit" in line or "ERROR" in line:
             window['-SERVER_STATE-'].update('Error')
+
+
 
 
 def start_server():
@@ -204,8 +221,8 @@ def send_chat():
 
 headings = ['Name', 'Xuid', 'Level']
 
-sg.theme('DefaultNoMoreNagging')
-#sg.theme('Darkamber')
+#sg.theme('DefaultNoMoreNagging')
+sg.theme('Darkamber')
 
 # a list of all the settings and their default values
 
@@ -298,7 +315,16 @@ home_output_column = [
     [sg.Text(' Console Output:')],
     [sg.Multiline(size=(160, 30), key='output', autoscroll=True, disabled=True)],
     [sg.InputText(size=(154,1), key='input'), sg.Button('Run', size=(5,1))],
+    [sg.Text('Server Information', font=('Helvetica', 16), size=(53,0), justification='right', pad=(0,10))],
+    [sg.Text('Server Name:', size=(40,0), justification='left', ), sg.Text('Info6:', size=(40,0), justification='center'), sg.Text('Info11:', size=(40,0), justification='right')],
+    [sg.Text('Level Name:', size=(40,0), justification='left'), sg.Text('Info7:', size=(40,0), justification='center'), sg.Text('Info12:', size=(40,0), justification='right')],
+    [sg.Text('Gamemode:', size=(40,0), justification='left'), sg.Text('Info8:', size=(40,0), justification='center'), sg.Text('Info13:', size=(40,0), justification='right')],
+    [sg.Text('Difficulty', size=(40,0), justification='left'), sg.Text('Info9:', size=(40,0), justification='center'), sg.Text('Info14:', size=(40,0), justification='right')],
+    [sg.Text('Info5:', size=(40,0), justification='left'), sg.Text('Info10:',size=(40,0), justification='center'), sg.Text('Info15:', size=(40,0), justification='right')],
+    [sg.Text('—'*88, pad = (0,0), justification = "center")],
+    [sg.Text('CPU / Ram Usage', font=('Helvetica', 16), size=(53,0), justification='right', pad=(0,10))],
     ]
+    
     
 home_column = [
 [sg.Column(home_output_column, justification = "left", vertical_alignment = ("top")),
@@ -315,9 +341,9 @@ backup_manager_column = [[sg.Text('Backup Manager UI')]]
 
 analasys_column = [[sg.Text('Analasys UI')]]
 
-server_settings_column1 = []
-
 # ------------------ code to assemble settings gui from settings.py ------------------------ #
+
+server_settings_column1 = []
 
 for setting_name, setting_value, options, description, tooltip in SETTINGS1:
     if options is None and description is None and setting_value is None:
@@ -400,7 +426,10 @@ server_settings_column = [
     [sg.Button('Save', size=(65,1)), sg.Button('Reset', size=(65,1)), sg.Button('Save Config', size=(66,1))]
 ]
 
-bspilot_settings_column = [[sg.Text('BSPilot Settings UI')]]
+bspilot_settings_column = [
+    [sg.Text('BSPilot Settings UI')]
+                              
+    ]
 
 layout = [
     [
@@ -564,65 +593,17 @@ def save_settings(values): # save changed settings to server.properties and ask 
     else:
         sg.Popup('No Settings Have Been Changed')
 
-
-
-
-
-##------------------------------------ http server for getting messages --------------------------------------##
+#---------chat stuff----------#
 
 message_log_file = "message_log.txt"  # File to save the messages
-latest_message = ""  # Shared variable for the latest message
-httpd = None  # HTTP server instance
 
-# Function to save the message to a file and update the latest_message variable
 def save_message_to_file(message):
     global latest_message
     with open(message_log_file, "a") as file:
         file.write(message + "\n")
     latest_message = message
 
-# Create the message log file if it doesn't exist
-if not os.path.exists(message_log_file):
-    open(message_log_file, "w").close()
-
-# Create a simple HTTP server handler
-class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
-    def do_POST(self):
-        content_length = int(self.headers["Content-Length"])
-        message = self.rfile.read(content_length).decode("utf-8")
-        save_message_to_file(message)
-        #print(message)        
-        formatted_message = f"<{latest_message.split('[', 1)[1].split(']')[0]}> {latest_message.split('[', 2)[2].split(']')[0]}"
-        message_list.append(formatted_message)
-        window["ingame_chat"].update(values=message_list)
-        self.send_response(200)
-        self.end_headers()
-
-    def do_GET(self):
-        self.send_response(404)
-        self.end_headers()
-
-# Function to start the HTTP server
-def start_http_server():
-    global httpd
-    server_address = ("", 3000)
-    httpd = http.server.HTTPServer(server_address, SimpleHTTPRequestHandler)
-    print("Server started on port 3000")
-    httpd.serve_forever()
-
-# Create the HTTP server thread
-http_server_thread = threading.Thread(target=start_http_server)
-
-def stop_http_server():
-    global httpd
-    if httpd:
-        httpd.shutdown()  # Stop the HTTP server
-        http_server_thread.join()  # Wait for the thread to finish
-
-##------------------------------------ http server for getting messages --------------------------------------##
-
-
-
+#---------chat stuff----------#
 
 while True:
     # read the window's events
@@ -643,9 +624,10 @@ while True:
             # run the .bat file with the command as an argument
             stop_flag = False
             start_server()
-            http_server_thread.start()
+            #http_server_thread.start()
 
     if event == 'Restart': # i removed all restart and auto restart code as it was unstable, will work on it later
+        window["ingame_chat"].update(values=message_list)
         restart_server()
 
     if event == 'Stop':
@@ -653,7 +635,7 @@ while True:
             sg.popup('Server is not running')
         else:
             stop_server()
-            stop_http_server()
+            #stop_http_server()
             player_list = []  # clear the player list
             window['player_list'].update(values=player_list)
             player_count = 0  # reset the player count
@@ -705,7 +687,7 @@ while True:
     if event in (None,):
         if process is not None:
             stop_server()
-            stop_http_server()
+            #stop_http_server()
             break
         else:
             break
